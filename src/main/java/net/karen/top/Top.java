@@ -1,5 +1,9 @@
 package net.karen.top;
 
+import net.karen.top.block.ModBlocks;
+import net.karen.top.item.ModCreativeModeTabs;
+import net.karen.top.item.ModItems;
+import net.karen.top.screen.menu.ModMenuTypes;
 import org.slf4j.Logger;
 
 import com.mojang.logging.LogUtils;
@@ -26,6 +30,13 @@ public class Top {
     public Top(IEventBus modEventBus, ModContainer modContainer) {
         // Register the commonSetup method for modloading
         modEventBus.addListener(this::commonSetup);
+
+
+        ModBlocks.register(modEventBus);
+        ModItems.register(modEventBus);
+        ModCreativeModeTabs.register(modEventBus);
+        ModMenuTypes.register(modEventBus);
+
 
         // Register ourselves for server and other game events we are interested in.
         // Note that this is necessary if and only if we want *this* class (ExampleMod) to respond directly to events.
