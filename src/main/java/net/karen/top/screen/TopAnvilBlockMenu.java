@@ -14,7 +14,6 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.*;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.item.enchantment.ItemEnchantments;
@@ -164,25 +163,6 @@ public class TopAnvilBlockMenu extends ItemCombinerMenu {
                     this.repairItemCountCost = count;
                 }
                 else {
-                    // Enchanted item + Book
-                    if (!usingBook && addition.is(Items.BOOK)) {
-                        ItemStack book = new ItemStack(Items.ENCHANTED_BOOK);
-                        ItemEnchantments oldEnchantments = EnchantmentHelper.getEnchantmentsForCrafting(result);
-                        book.set(DataComponents.STORED_ENCHANTMENTS, oldEnchantments);
-                        for (Object2IntMap.Entry<Holder<Enchantment>> entry : oldEnchantments.entrySet()) {
-                            Holder<Enchantment> enchantmentHolder = entry.getKey();
-                            int level =  entry.getIntValue();
-                            book.enchant(enchantmentHolder, level);
-                        }
-                        int baseCost = addition.getOrDefault(DataComponents.REPAIR_COST, 0);
-                        addition.set(DataComponents.REPAIR_COST, baseCost);
-                        EnchantmentHelper.setEnchantments(book, oldEnchantments);
-                        this.resultSlots.setItem(0, book); // book
-                        this.cost.set(1); // Cost > 0
-                        this.broadcastChanges();
-                        return;
-                    }
-
                     if (!usingBook && (!result.is(addition.getItem()) || !result.isDamageableItem())) {
                         this.resultSlots.setItem(0, ItemStack.EMPTY);
                         this.cost.set(0);
