@@ -4,6 +4,7 @@ import com.mojang.serialization.MapCodec;
 import net.karen.top.screen.TopAnvilBlockMenu;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.stats.Stats;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.MenuProvider;
@@ -30,14 +31,12 @@ public class TopAnvilBlock extends Block {
     }
 
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hitResult) {
-        if (!level.isClientSide()) {
-            player.openMenu(state.getMenuProvider(level, pos));
-            player.awardStat(Stats.INTERACT_WITH_ANVIL);
+        if (!level.isClientSide() && player instanceof ServerPlayer serverPlayer) {
+            serverPlayer.openMenu(state.getMenuProvider(level, pos));
+            serverPlayer.awardStat(Stats.INTERACT_WITH_ANVIL);
         }
-
         return InteractionResult.SUCCESS;
     }
-
 
     protected @Nullable MenuProvider getMenuProvider(BlockState state, Level level, BlockPos pos) {
         return new SimpleMenuProvider((containerId, inventory, player) ->
