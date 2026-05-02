@@ -35,19 +35,17 @@ public class TopAnvilBlockMenu extends ItemCombinerMenu {
         this(containerId, inventory, ContainerLevelAccess.NULL);
     }
 
-    public TopAnvilBlockMenu(int containerId, Inventory inventory, ContainerLevelAccess context) {
-        super(ModMenuTypes.TOP_MENU.get(), containerId, inventory, context, createInputSlotDefinitions());
+    public TopAnvilBlockMenu(int containerId, Inventory inventory, ContainerLevelAccess access) {
+        super(ModMenuTypes.TOP_MENU.get(), containerId, inventory, access, createInputSlotDefinitions());
         this.cost = DataSlot.standalone();
         this.onlyRenaming = false;
         this.addDataSlot(this.cost);
     }
 
     private static ItemCombinerMenuSlotDefinition createInputSlotDefinitions() {
-        return ItemCombinerMenuSlotDefinition.create()
-                                             .withSlot(0, 27, 47,
-                                                       (_) -> true).withSlot(1, 76, 47,
-                                                       (_) -> true).withResultSlot(2, 134, 47)
-                                             .build();
+        return ItemCombinerMenuSlotDefinition.create().withSlot(0, 27, 47, (_) -> true)
+                                                      .withSlot(1, 76, 47, (_) -> true)
+                                                      .withResultSlot(2, 134, 47).build();
     }
 
     @Override
@@ -62,8 +60,8 @@ public class TopAnvilBlockMenu extends ItemCombinerMenu {
         ItemStack rightInput = this.inputSlots.getItem(1);
 
         if (!leftInput.isEmpty()) {
-            var event = new AnvilUpdateEvent(leftInput, rightInput, this.itemName, resultSlots.getItem(0),
-                                             this.getCost(), this.repairItemCountCost, player);
+            AnvilUpdateEvent event = new AnvilUpdateEvent(leftInput, rightInput, this.itemName, resultSlots.getItem(0),
+                                                          this.getCost(), this.repairItemCountCost, player);
             // If the event is canceled, the anvil operation is void. Set the result to empty and the cost to zero.
             if (NeoForge.EVENT_BUS.post(event).isCanceled()) {
                 resultSlots.setItem(0, ItemStack.EMPTY);
@@ -89,10 +87,10 @@ public class TopAnvilBlockMenu extends ItemCombinerMenu {
         }
 
         if (this.repairItemCountCost > 0) {
-            ItemStack addition = this.inputSlots.getItem(1);
-            if (!addition.isEmpty() && addition.getCount() > this.repairItemCountCost) {
-                addition.shrink(this.repairItemCountCost);
-                this.inputSlots.setItem(1, addition);
+            ItemStack rightInput = this.inputSlots.getItem(1);
+            if (!rightInput.isEmpty() && rightInput.getCount() > this.repairItemCountCost) {
+                rightInput.shrink(this.repairItemCountCost);
+                this.inputSlots.setItem(1, rightInput);
             }
             else {
                 this.inputSlots.setItem(1, ItemStack.EMPTY);
@@ -126,71 +124,67 @@ public class TopAnvilBlockMenu extends ItemCombinerMenu {
             else {
                 level.levelEvent(1030, pos, 0);
             }
-
         });
     }
 
     protected void createResultInternal() {
-        ItemStack input = this.inputSlots.getItem(0);
+        ItemStack leftInput = this.inputSlots.getItem(0); // Left slot
         this.onlyRenaming = false;
         this.cost.set(1);
         int price = 0;
         long tax = 0L;
         int namingCost = 0;
-        if (!input.isEmpty() && EnchantmentHelper.canStoreEnchantments(input)) {
-            ItemStack result = input.copy();
-            ItemStack addition = this.inputSlots.getItem(1);
+        if (!leftInput.isEmpty() && EnchantmentHelper.canStoreEnchantments(leftInput)) {
+            ItemStack result = leftInput.copy();
+            ItemStack rightInput = this.inputSlots.getItem(1); // Right slot
             ItemEnchantments.Mutable enchantments = new ItemEnchantments.Mutable(EnchantmentHelper.getEnchantmentsForCrafting(result));
-            tax += (long) input.getOrDefault(DataComponents.REPAIR_COST, 0) + (long) addition.getOrDefault(DataComponents.REPAIR_COST, 0);
+            tax += (long) leftInput.getOrDefault(DataComponents.REPAIR_COST, 0) + (long) rightInput.getOrDefault(DataComponents.REPAIR_COST, 0);
             this.repairItemCountCost = 0;
-            if (!addition.isEmpty()) {
-                boolean usingBook = addition.has(DataComponents.STORED_ENCHANTMENTS);
-                if (result.isDamageableItem() && input.isValidRepairItem(addition)) {
+            if (!rightInput.isEmpty()) {
+                boolean usingBookRight = rightInput.has(DataComponents.STORED_ENCHANTMENTS);
+                if (result.isDamageableItem() && leftInput.isValidRepairItem(rightInput)) {
                     int repairAmount = Math.min(result.getDamageValue(), result.getMaxDamage() / 4);
                     if (repairAmount <= 0) {
-                        this.resultSlots.setItem(0, ItemStack.EMPTY);
-                        this.cost.set(0);
+                        emptyResultSlot();
                         return;
                     }
 
                     int count;
-                    for(count = 0; repairAmount > 0 && count < addition.getCount(); ++count) {
+                    for (count = 0; repairAmount > 0 && count < rightInput.getCount(); ++count) {
                         int resultDamage = result.getDamageValue() - repairAmount;
                         result.setDamageValue(resultDamage);
                         ++price;
                         repairAmount = Math.min(result.getDamageValue(), result.getMaxDamage() / 4);
                     }
-
                     this.repairItemCountCost = count;
                 }
                 else {
                     // Enchanted item + Book
-                    if (!usingBook && addition.is(Items.BOOK)) {
+                    boolean usingBookLeft = leftInput.has(DataComponents.STORED_ENCHANTMENTS);
+                    boolean isBook = (leftInput.isEnchanted() && leftInput.has(DataComponents.ENCHANTMENTS) && (!usingBookLeft && leftInput.is(Items.BOOK))) &&
+                                     (!usingBookRight && rightInput.is(Items.BOOK));
+                    if (isBook) {
                         ItemStack book = new ItemStack(Items.ENCHANTED_BOOK);
-                        ItemEnchantments oldEnchantments = EnchantmentHelper.getEnchantmentsForCrafting(result);
-                        book.set(DataComponents.STORED_ENCHANTMENTS, oldEnchantments);
-                        for (Object2IntMap.Entry<Holder<Enchantment>> entry : oldEnchantments.entrySet()) {
+                        for (Object2IntMap.Entry<Holder<Enchantment>> entry : enchantments.toImmutable().entrySet()) {
                             Holder<Enchantment> enchantmentHolder = entry.getKey();
                             int level =  entry.getIntValue();
                             book.enchant(enchantmentHolder, level);
                         }
-                        int baseCost = addition.getOrDefault(DataComponents.REPAIR_COST, 0);
-                        addition.set(DataComponents.REPAIR_COST, baseCost);
-                        EnchantmentHelper.setEnchantments(book, oldEnchantments);
+                        int baseCost = rightInput.getOrDefault(DataComponents.REPAIR_COST, 0);
+                        rightInput.set(DataComponents.REPAIR_COST, calculateIncreasedRepairCost(baseCost));
+                        EnchantmentHelper.setEnchantments(book, enchantments.toImmutable());
                         this.resultSlots.setItem(0, book); // book
-                        this.cost.set(1); // Cost > 0
                         this.broadcastChanges();
                         return;
                     }
 
-                    if (!usingBook && (!result.is(addition.getItem()) || !result.isDamageableItem())) {
-                        this.resultSlots.setItem(0, ItemStack.EMPTY);
-                        this.cost.set(0);
+                    if (!usingBookRight && (!result.is(rightInput.getItem()) || !result.isDamageableItem())) {
+                        emptyResultSlot();
                         return;
                     }
 
-                    if (result.isDamageableItem() && !usingBook) {
-                        int resultDamage = getResultDamage(input, addition, result);
+                    if (result.isDamageableItem() && !usingBookRight) {
+                        int resultDamage = getResultDamage(leftInput, rightInput, result);
 
                         if (resultDamage < result.getDamageValue()) {
                             result.setDamageValue(resultDamage);
@@ -198,7 +192,7 @@ public class TopAnvilBlockMenu extends ItemCombinerMenu {
                         }
                     }
 
-                    ItemEnchantments additionalEnchantments = EnchantmentHelper.getEnchantmentsForCrafting(addition);
+                    ItemEnchantments additionalEnchantments = EnchantmentHelper.getEnchantmentsForCrafting(rightInput);
                     boolean isAnyEnchantmentCompatible = false;
                     boolean isAnyEnchantmentNotCompatible = false;
 
@@ -206,9 +200,9 @@ public class TopAnvilBlockMenu extends ItemCombinerMenu {
                         Holder<Enchantment> enchantmentHolder = entry.getKey();
                         int current = enchantments.getLevel(enchantmentHolder);
                         int level = entry.getIntValue();
-                        level = current + level; // Sum current and level enchantments
+                        level = Integer.sum(current, level); // Sum current and level enchantments
                         Enchantment enchantment = enchantmentHolder.value();
-                        boolean compatible = input.supportsEnchantment(enchantmentHolder);
+                        boolean compatible = leftInput.supportsEnchantment(enchantmentHolder);
                         if (this.player.getAbilities().instabuild) {
                             compatible = true;
                         }
@@ -231,33 +225,32 @@ public class TopAnvilBlockMenu extends ItemCombinerMenu {
 
                             enchantments.set(enchantmentHolder, level);
                             int fee = enchantment.getAnvilCost();
-                            if (usingBook) {
+                            if (usingBookRight) {
                                 fee = Math.max(1, fee / 2);
                             }
 
                             price += fee * level;
-                            if (input.getCount() > 1) {
+                            if (leftInput.getCount() > 1) {
                                 price = 40;
                             }
                         }
                     }
 
                     if (isAnyEnchantmentNotCompatible && !isAnyEnchantmentCompatible) {
-                        this.resultSlots.setItem(0, ItemStack.EMPTY);
-                        this.cost.set(0);
+                        emptyResultSlot();
                         return;
                     }
                 }
             }
 
             if (this.itemName != null && !StringUtil.isBlank(this.itemName)) {
-                if (!this.itemName.equals(input.getHoverName().getString())) {
+                if (!this.itemName.equals(leftInput.getHoverName().getString())) {
                     namingCost = 1;
                     price += namingCost;
                     result.set(DataComponents.CUSTOM_NAME, Component.literal(this.itemName));
                 }
             }
-            else if (input.has(DataComponents.CUSTOM_NAME)) {
+            else if (leftInput.has(DataComponents.CUSTOM_NAME)) {
                 namingCost = 1;
                 price += namingCost;
                 result.remove(DataComponents.CUSTOM_NAME);
@@ -283,8 +276,8 @@ public class TopAnvilBlockMenu extends ItemCombinerMenu {
 
             if (!result.isEmpty()) {
                 int baseCost = result.getOrDefault(DataComponents.REPAIR_COST, 0);
-                if (baseCost < addition.getOrDefault(DataComponents.REPAIR_COST, 0)) {
-                    baseCost = addition.getOrDefault(DataComponents.REPAIR_COST, 0);
+                if (baseCost < rightInput.getOrDefault(DataComponents.REPAIR_COST, 0)) {
+                    baseCost = rightInput.getOrDefault(DataComponents.REPAIR_COST, 0);
                 }
 
                 if (namingCost != price || namingCost == 0) {
@@ -299,10 +292,13 @@ public class TopAnvilBlockMenu extends ItemCombinerMenu {
             this.broadcastChanges();
         }
         else {
-            this.resultSlots.setItem(0, ItemStack.EMPTY);
-            this.cost.set(0);
+            emptyResultSlot();
         }
+    }
 
+    private void emptyResultSlot() {
+        this.resultSlots.setItem(0, ItemStack.EMPTY);
+        this.cost.set(0);
     }
 
     private static int getResultDamage(ItemStack input, ItemStack addition, ItemStack result) {
