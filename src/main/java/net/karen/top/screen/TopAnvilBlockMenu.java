@@ -31,6 +31,34 @@ public class TopAnvilBlockMenu extends ItemCombinerMenu {
     private final DataSlot cost;
     private boolean onlyRenaming;
 
+    private final int INPUT_SLOT_0 = 0;
+    private final int INPUT_SLOT_1 = 1;
+    private final int RESULT_SLOT = 0;
+
+    public int getCost() {
+        return this.cost.get();
+    }
+
+    public void setCost(int value) {
+        this.cost.set(Math.max(0, value));
+    }
+
+    private ItemStack getInputItem(int slot) {
+        return this.inputSlots.getItem(slot);
+    }
+
+    private void setInputItem(int slot, @NonNull ItemStack stack) {
+        this.inputSlots.setItem(slot, stack);
+    }
+
+    private ItemStack getResultItem() {
+        return resultSlots.getItem(RESULT_SLOT);
+    }
+
+    private void setResultItem(@NonNull ItemStack stack) {
+        resultSlots.setItem(RESULT_SLOT, stack);
+    }
+
     public TopAnvilBlockMenu(int containerId, Inventory inventory) {
         this(containerId, inventory, ContainerLevelAccess.NULL);
     }
@@ -56,58 +84,62 @@ public class TopAnvilBlockMenu extends ItemCombinerMenu {
     @Override
     public void createResult() {
         this.createResultInternal();
-        ItemStack leftInput = this.inputSlots.getItem(0);
-        ItemStack rightInput = this.inputSlots.getItem(1);
+        ItemStack leftInput = getInputItem(INPUT_SLOT_0);
+        ItemStack rightInput = getInputItem(INPUT_SLOT_1);
 
         if (!leftInput.isEmpty()) {
-            AnvilUpdateEvent event = new AnvilUpdateEvent(leftInput, rightInput, this.itemName, resultSlots.getItem(0),
-                                                          this.getCost(), this.repairItemCountCost, player);
+            AnvilUpdateEvent event = new AnvilUpdateEvent(leftInput, rightInput, this.itemName, getResultItem(),
+                                                          getCost(), this.repairItemCountCost, player);
             // If the event is canceled, the anvil operation is void. Set the result to empty and the cost to zero.
             if (NeoForge.EVENT_BUS.post(event).isCanceled()) {
-                resultSlots.setItem(0, ItemStack.EMPTY);
+                this.setResultItem(ItemStack.EMPTY);
                 this.setCost(0);
                 this.repairItemCountCost = 0;
                 return;
             }
 
             // Otherwise, update the results to the new values.
-            resultSlots.setItem(0, event.getOutput());
+            this.setResultItem(event.getOutput());
             this.setCost(event.getXpCost());
             this.repairItemCountCost = event.getMaterialCost();
         }
     }
 
     protected boolean mayPickup(Player player, boolean hasItem) {
-        return (player.hasInfiniteMaterials() || player.experienceLevel >= this.cost.get()) && this.cost.get() > 0;
+        return (player.hasInfiniteMaterials() || player.experienceLevel >= getCost()) && getCost() > 0;
     }
 
     protected void onTake(Player player, @NonNull ItemStack carried) {
         if (!player.hasInfiniteMaterials()) {
-            player.giveExperienceLevels(-this.cost.get());
+            player.giveExperienceLevels(-getCost());
         }
 
+        ItemStack leftInput = getInputItem(INPUT_SLOT_0);
+        ItemStack rightInput = getInputItem(INPUT_SLOT_1);
+
         if (this.repairItemCountCost > 0) {
-            ItemStack rightInput = this.inputSlots.getItem(1);
             if (!rightInput.isEmpty() && rightInput.getCount() > this.repairItemCountCost) {
                 rightInput.shrink(this.repairItemCountCost);
-                this.inputSlots.setItem(1, rightInput);
+                setInputItem(INPUT_SLOT_1, rightInput);
             }
             else {
-                this.inputSlots.setItem(1, ItemStack.EMPTY);
+                setInputItem(INPUT_SLOT_1, ItemStack.EMPTY);
             }
         }
         else if (!this.onlyRenaming) {
-            this.inputSlots.setItem(1, ItemStack.EMPTY);
+            setInputItem(INPUT_SLOT_1, ItemStack.EMPTY);
         }
 
-        this.cost.set(0);
+        setCost(0);
         if (player instanceof ServerPlayer serverPlayer) {
-            if (!StringUtil.isBlank(this.itemName) && !this.inputSlots.getItem(0).getHoverName().getString().equals(this.itemName)) {
+            if (!StringUtil.isBlank(this.itemName) && !leftInput.getHoverName().getString().equals(this.itemName)) {
                 serverPlayer.getTextFilter().processStreamMessage(this.itemName);
             }
         }
 
-        this.inputSlots.setItem(0, ItemStack.EMPTY);
+        setInputItem(INPUT_SLOT_0, ItemStack.EMPTY);
+
+        // Anvil falling block damage
         this.access.execute((level, pos) -> {
             BlockState state = level.getBlockState(pos);
             if (!player.hasInfiniteMaterials() && state.is(BlockTags.ANVIL) && player.getRandom().nextFloat() < 0.12F) {
@@ -128,15 +160,15 @@ public class TopAnvilBlockMenu extends ItemCombinerMenu {
     }
 
     protected void createResultInternal() {
-        ItemStack leftInput = this.inputSlots.getItem(0); // Left slot
+        ItemStack leftInput = getInputItem(INPUT_SLOT_0); // Left slot
         this.onlyRenaming = false;
-        this.cost.set(1);
+        setCost(1);
         int price = 0;
         long tax = 0L;
         int namingCost = 0;
         if (!leftInput.isEmpty() && EnchantmentHelper.canStoreEnchantments(leftInput)) {
             ItemStack result = leftInput.copy();
-            ItemStack rightInput = this.inputSlots.getItem(1); // Right slot
+            ItemStack rightInput = getInputItem(INPUT_SLOT_1); // Right slot
             ItemEnchantments.Mutable enchantments = new ItemEnchantments.Mutable(EnchantmentHelper.getEnchantmentsForCrafting(result));
             tax += (long) leftInput.getOrDefault(DataComponents.REPAIR_COST, 0) + (long) rightInput.getOrDefault(DataComponents.REPAIR_COST, 0);
             this.repairItemCountCost = 0;
@@ -159,9 +191,9 @@ public class TopAnvilBlockMenu extends ItemCombinerMenu {
                     this.repairItemCountCost = count;
                 }
                 else {
+                    boolean isInvalidItem = result.is(Items.BOOK) || result.is(Items.ENCHANTED_BOOK);
                     // Enchanted item + Book
-                    boolean usingBookLeft = leftInput.has(DataComponents.STORED_ENCHANTMENTS);
-                    boolean isBook = (leftInput.isEnchanted() && leftInput.has(DataComponents.ENCHANTMENTS) && (!usingBookLeft && leftInput.is(Items.BOOK))) &&
+                    boolean isBook = (result.has(DataComponents.ENCHANTMENTS) && !isInvalidItem) &&
                                      (!usingBookRight && rightInput.is(Items.BOOK));
                     if (isBook) {
                         ItemStack book = new ItemStack(Items.ENCHANTED_BOOK);
@@ -170,15 +202,14 @@ public class TopAnvilBlockMenu extends ItemCombinerMenu {
                             int level =  entry.getIntValue();
                             book.enchant(enchantmentHolder, level);
                         }
-                        int baseCost = rightInput.getOrDefault(DataComponents.REPAIR_COST, 0);
-                        rightInput.set(DataComponents.REPAIR_COST, calculateIncreasedRepairCost(baseCost));
                         EnchantmentHelper.setEnchantments(book, enchantments.toImmutable());
-                        this.resultSlots.setItem(0, book); // book
-                        this.broadcastChanges();
+                        changedSlots(book); // book
                         return;
                     }
 
-                    if (!usingBookRight && (!result.is(rightInput.getItem()) || !result.isDamageableItem())) {
+                    boolean isBookRight = !usingBookRight && (!result.is(rightInput.getItem()) || !result.isDamageableItem());
+                    boolean isBookLeft = leftInput.has(DataComponents.ENCHANTABLE) && leftInput.is(Items.BOOK);
+                    if (isBookRight || isBookLeft) {
                         emptyResultSlot();
                         return;
                     }
@@ -257,20 +288,19 @@ public class TopAnvilBlockMenu extends ItemCombinerMenu {
             }
 
             int finalPrice = price <= 0 ? 0 : (int) Mth.clamp(tax + (long)price, 0L, 2147483647L);
-            this.cost.set(finalPrice);
+            setCost(finalPrice);
             if (price <= 0) {
                 result = ItemStack.EMPTY;
             }
 
             if (namingCost == price && namingCost > 0) {
-                if (this.cost.get() >= 40) {
-                    this.cost.set(39);
+                if (getCost() >= 40) {
+                    setCost(39);
                 }
-
                 this.onlyRenaming = true;
             }
 
-            if (this.cost.get() >= 40 && !this.player.hasInfiniteMaterials()) {
+            if (getCost() >= 40 && !this.player.hasInfiniteMaterials()) {
                 result = ItemStack.EMPTY;
             }
 
@@ -283,21 +313,23 @@ public class TopAnvilBlockMenu extends ItemCombinerMenu {
                 if (namingCost != price || namingCost == 0) {
                     baseCost = calculateIncreasedRepairCost(baseCost);
                 }
-
                 result.set(DataComponents.REPAIR_COST, baseCost);
                 EnchantmentHelper.setEnchantments(result, enchantments.toImmutable());
             }
-
-            this.resultSlots.setItem(0, result);
-            this.broadcastChanges();
+            changedSlots(result);
         }
         else {
             emptyResultSlot();
         }
     }
 
+    private void changedSlots(@NonNull ItemStack stack) {
+        setResultItem(stack);
+        this.broadcastChanges();
+    }
+
     private void emptyResultSlot() {
-        this.resultSlots.setItem(0, ItemStack.EMPTY);
+        setResultItem(ItemStack.EMPTY);
         this.cost.set(0);
     }
 
@@ -314,7 +346,7 @@ public class TopAnvilBlockMenu extends ItemCombinerMenu {
     }
 
     public static int calculateIncreasedRepairCost(int baseCost) {
-        return (int)Math.min((long)baseCost * 2L + 1L, 2147483647L);
+        return (int) Math.min((long) baseCost * 2L + 1L, 2147483647L);
     }
 
     public boolean setItemName(String name) {
@@ -330,7 +362,6 @@ public class TopAnvilBlockMenu extends ItemCombinerMenu {
                     itemStack.set(DataComponents.CUSTOM_NAME, Component.literal(validatedName));
                 }
             }
-
             this.createResult();
             return true;
         }
@@ -342,13 +373,5 @@ public class TopAnvilBlockMenu extends ItemCombinerMenu {
     private static @Nullable String validateName(String name) {
         String filteredName = StringUtil.filterText(name);
         return filteredName.length() <= 50 ? filteredName : null;
-    }
-
-    public int getCost() {
-        return this.cost.get();
-    }
-
-    public void setCost(int value) {
-        this.cost.set(Math.max(0, value));
     }
 }
