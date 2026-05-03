@@ -2,7 +2,6 @@ package net.karen.top.screen;
 
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import net.karen.top.block.ModBlocks;
-import net.karen.top.screen.menu.ModMenuTypes;
 import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;

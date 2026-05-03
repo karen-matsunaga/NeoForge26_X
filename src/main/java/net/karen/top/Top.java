@@ -3,7 +3,7 @@ package net.karen.top;
 import net.karen.top.block.ModBlocks;
 import net.karen.top.item.ModCreativeModeTabs;
 import net.karen.top.item.ModItems;
-import net.karen.top.screen.menu.ModMenuTypes;
+import net.karen.top.screen.ModMenuTypes;
 import org.slf4j.Logger;
 
 import com.mojang.logging.LogUtils;

@@ -1,7 +1,6 @@
-package net.karen.top.screen.menu;
+package net.karen.top.screen;
 
 import net.karen.top.Top;
-import net.karen.top.screen.TopAnvilBlockMenu;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.flag.FeatureFlags;

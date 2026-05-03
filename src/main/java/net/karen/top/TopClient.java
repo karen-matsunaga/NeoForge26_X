@@ -1,7 +1,7 @@
 package net.karen.top;
 
 import net.karen.top.screen.TopAnvilBlockScreen;
-import net.karen.top.screen.menu.ModMenuTypes;
+import net.karen.top.screen.ModMenuTypes;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
